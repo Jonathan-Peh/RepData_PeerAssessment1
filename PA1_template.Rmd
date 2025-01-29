@@ -5,21 +5,101 @@ output:
     keep_md: true
 ---
 
+First, we unzip the provided ZIP file for the data file
+```{r}
+unzip("Reproducible Research/repdata_data_activity.zip",exdir = "Reproducible Research")
+```
+Then, we read the data from the file into R
+```{r}
+data = read.csv("Reproducible Research/activity.csv")
+```
+Question 1: What is mean total number of steps taken per day?
+=============================================================
+Calculate the total number of steps taken per day
+```{r}
+#removing NA
+noNA = data[!is.na(data$steps),]
+totalstepsperday = tapply(noNA$steps,noNA$date,sum)
+```
 
-## Loading and preprocessing the data
+If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+```{r,fig.width=10}
+hist(totalstepsperday, xlab = "Total Number of Steps per day", main = "Distribution of Steps Per Day",ylim = c(0,30))
+```
 
+Calculate and report the mean and median of the total number of steps taken per day
+```{r,results='hold'}
+print(paste("mean of total numer of steps per day is",mean(totalstepsperday)))
+print(paste("median of total numer of steps per day is",median(totalstepsperday)))
+```
 
+What is the average daily activity pattern?
+===========================================
+Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+```{r,fig.width=10}
+averagestepsperinterval = tapply(noNA$steps,noNA$interval,mean)
+plot(unlist(dimnames(averagestepsperinterval)),averagestepsperinterval,type="l")
+```
 
-## What is mean total number of steps taken per day?
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+print(paste("the 5-minute interval with the maximum number of steps is",max(averagestepsperinterval)))
+```
 
+Imputing missing values
+=======================
+Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r}
+print(paste("total number of missing values is", sum(is.na(data$steps))))
+```
 
+Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.Create a new dataset that is equal to the original dataset but with the missing data filled in.
+We will be choosing the mean of that 5-minute interval to fill in missing values
+```{r}
+for (i in 1:nrow(data)){
+  if (is.na(data$steps[i])){
+    data$steps[i] = averagestepsperinterval[which(unlist(dimnames(averagestepsperinterval)) == data$interval[i])]
+  }
+}
+```
 
-## What is the average daily activity pattern?
+Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r,fig.width=10}
+totalstepsperday_imputed = tapply(data$steps,data$date,sum)
+hist(totalstepsperday_imputed, xlab = "Total Number of Steps per day", main = "Distribution of Steps Per Day (with Imputed Data)")
+```
+```{r,results='hold',fig.width=10}
+print(paste("new mean is", mean(totalstepsperday_imputed)))
+print(paste("new median is", median(totalstepsperday_imputed)))
+print("mean does not change but median increases very slightly.")
+plot(as.Date(unlist(dimnames(totalstepsperday))), totalstepsperday,col=rgb(0,0,1,0.5),pch=16,xlab ="",ylab="Total Number of Steps per day",ylim=c(0,30000))
+legend("topright",legend = c("non-imputed","imputed"),col=c(rgb(0,0,1,0.5),rgb(1,0,0,0.5)),pch=16)
+points(as.Date(unlist(dimnames(totalstepsperday_imputed))),totalstepsperday_imputed,col=rgb(1,0,0,0.5),pch=c(16,16))
+```
+As seen on the graph, imputed data did not affect existing values, but it did add values for days without data
 
+Are there differences in activity patterns between weekdays and weekends?
+====
+Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+data$date = as.Date(data$date)
+WeekdayOrWeekend = weekdays(data$date)
+for (i in 1:length(WeekdayOrWeekend)){
+  if (WeekdayOrWeekend[i] == "Saturday"|WeekdayOrWeekend[i] == "Sunday"){
+    WeekdayOrWeekend[i] = "weekend"
+  }
+  else{
+    WeekdayOrWeekend[i] = "weekday"
+  }
+}
+data$WeekdayOrWeekend = factor(WeekdayOrWeekend)
+head(data)
+```
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+```{r}
+library(lattice)
+library(reshape2)
+final = melt(tapply(data$steps,list(data$interval,data$WeekdayOrWeekend),mean))
+xyplot(value ~ Var1|Var2, data = final,type="l",ylab = "Average No. of Steps",xlab = "Intervals")
+```
